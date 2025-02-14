@@ -8,12 +8,14 @@ class Paper {
   prevMouseY = 0;
   velX = 0;
   velY = 0;
-  rotation = Math.random() * 30 - 15;
+  rotation = Math.random() * 30 - 15; // Rotasi awal acak
   currentPaperX = 0;
   currentPaperY = 0;
   rotating = false;
 
   init(paper) {
+    this.paper = paper;
+
     // Mouse events
     document.addEventListener("mousemove", (e) => {
       this.handleMove(e.clientX, e.clientY);
@@ -22,9 +24,6 @@ class Paper {
     paper.addEventListener("mousedown", (e) => {
       if (e.button === 0) {
         this.handleStart(e.clientX, e.clientY);
-      }
-      if (e.button === 2) {
-        this.rotating = true;
       }
     });
 
@@ -47,46 +46,29 @@ class Paper {
     paper.addEventListener("touchend", () => {
       this.handleEnd();
     });
-
-    // Gesture events for rotation on touch screens
-    paper.addEventListener("gesturestart", (e) => {
-      e.preventDefault();
-      this.rotating = true;
-    });
-
-    paper.addEventListener("gestureend", () => {
-      this.rotating = false;
-    });
   }
 
   handleMove(x, y) {
-    if (!this.rotating) {
-      this.velX = x - this.prevMouseX;
-      this.velY = y - this.prevMouseY;
-    }
+    if (!this.holdingPaper) return;
 
-    const dirX = x - this.mouseTouchX;
-    const dirY = y - this.mouseTouchY;
-    const dirLength = Math.sqrt(dirX * dirX + dirY * dirY);
-    const dirNormalizedX = dirX / dirLength;
-    const dirNormalizedY = dirY / dirLength;
+    const deltaX = x - this.prevMouseX;
+    const deltaY = y - this.prevMouseY;
 
-    const angle = Math.atan2(dirNormalizedY, dirNormalizedX);
-    let degrees = ((180 * angle) / Math.PI + 360) % 360;
-    if (this.rotating) {
-      this.rotation = degrees;
-    }
+    // Update velocity
+    this.velX = deltaX * 0.8;
+    this.velY = deltaY * 0.8;
 
-    if (this.holdingPaper) {
-      if (!this.rotating) {
-        this.currentPaperX += this.velX;
-        this.currentPaperY += this.velY;
-      }
-      this.prevMouseX = x;
-      this.prevMouseY = y;
+    this.currentPaperX += this.velX;
+    this.currentPaperY += this.velY;
 
-      this.paper.style.transform = `translateX(${this.currentPaperX}px) translateY(${this.currentPaperY}px) rotateZ(${this.rotation}deg)`;
-    }
+    this.paper.style.transform = `
+      translateX(${this.currentPaperX}px) 
+      translateY(${this.currentPaperY}px) 
+      rotateZ(${this.rotation}deg)
+    `;
+
+    this.prevMouseX = x;
+    this.prevMouseY = y;
   }
 
   handleStart(x, y) {
@@ -104,7 +86,40 @@ class Paper {
 
   handleEnd() {
     this.holdingPaper = false;
-    this.rotating = false;
+
+    this.applyMomentum();
+  }
+
+  applyMomentum() {
+    const momentumFactor = 0.7;
+    const minVelocity = 0.1;
+
+    const apply = () => {
+      if (
+        Math.abs(this.velX) > minVelocity ||
+        Math.abs(this.velY) > minVelocity
+      ) {
+        this.currentPaperX += this.velX;
+        this.currentPaperY += this.velY;
+
+        this.velX *= momentumFactor;
+        this.velY *= momentumFactor;
+
+        this.paper.style.transform = `
+          translateX(${this.currentPaperX}px) 
+          translateY(${this.currentPaperY}px) 
+          rotateZ(${this.rotation}deg)
+        `;
+
+        requestAnimationFrame(apply);
+      }
+    };
+
+    requestAnimationFrame(apply);
+  }
+
+  lerp(start, end, factor) {
+    return start + (end - start) * factor;
   }
 }
 
@@ -112,6 +127,5 @@ const papers = Array.from(document.querySelectorAll(".paper"));
 
 papers.forEach((paper) => {
   const p = new Paper();
-  p.paper = paper; // Assign the paper element to the instance
   p.init(paper);
 });
